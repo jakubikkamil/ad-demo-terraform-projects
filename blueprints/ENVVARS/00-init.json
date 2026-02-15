@@ -1,0 +1,13 @@
+{
+  "tags": {
+    "Environment": "dev",
+    "Project": "ad-demo",
+    "ManagedBy": "terraform"
+  },
+  "resource_prefix": "addemo",
+  "location": "westeurope",
+  "admins": [],
+  "readers": [],
+  "data_writers": [],
+  "data_readers": []
+}

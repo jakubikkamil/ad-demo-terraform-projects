@@ -1,0 +1,15 @@
+{
+  "resource_prefix": "addemo",
+  "location": "westeurope",
+  "tags": {
+    "Environment": "dev",
+    "Project": "ad-demo",
+    "ManagedBy": "terraform"
+  },
+  "name_override": "",
+  "account_tier": "Standard",
+  "account_replication_type": "LRS",
+  "account_kind": "StorageV2",
+  "access_tier": "Hot",
+  "allow_public_network_access": true
+}
