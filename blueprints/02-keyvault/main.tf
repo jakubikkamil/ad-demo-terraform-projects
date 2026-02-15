@@ -1,7 +1,7 @@
 locals {
   # Key Vault name: 3-24 chars, letters, numbers, hyphens; start with letter; no consecutive hyphens
   prefix_clean  = replace(lower(var.resource_prefix), "/[^a-z0-9]/", "")
-  base_name     = var.name_override != "" ? replace(var.name_override, "/[^a-zA-Z0-9-]/", "") : "${prefix_clean}-kv"
+  base_name     = var.name_override != "" ? replace(var.name_override, "/[^a-zA-Z0-9-]/", "") : "${local.prefix_clean}-kv"
   keyvault_name = substr("${local.base_name}${substr(md5("${var.resource_group_name}-${var.location}"), 0, 6)}", 0, 24)
 
   # Build role_assignments from permission lists (Key Vault RBAC)
@@ -45,8 +45,8 @@ locals {
 }
 
 module "keyvault" {
-  source = "Azure/avm-res-keyvault-vault/azurerm"
-  version = "~> 1.0"
+  source  = "Azure/avm-res-keyvault-vault/azurerm"
+  version = "~> 0.10"
 
   name                = local.keyvault_name
   location             = var.location

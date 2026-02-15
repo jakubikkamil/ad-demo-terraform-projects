@@ -24,6 +24,6 @@ resource "azurerm_storage_account" "this" {
 locals {
   # Storage account names: 3-24 chars, lowercase alphanumeric only
   prefix_clean = replace(lower(var.resource_prefix), "/[^a-z0-9]/", "")
-  base_name    = var.name_override != "" ? lower(replace(var.name_override, "/[^a-z0-9]/", "")) : "${prefix_clean}st"
+  base_name    = var.name_override != "" ? lower(replace(var.name_override, "/[^a-z0-9]/", "")) : "${local.prefix_clean}st"
   storage_account_name = substr("${local.base_name}${substr(md5("${var.resource_group_name}-${var.location}"), 0, 8)}", 0, 24)
 }
