@@ -4,8 +4,13 @@ output "tags" {
 }
 
 output "resource_prefix" {
-  value       = var.resource_prefix
+  value       = local.resource_prefix
   description = "Resource naming prefix for inherited modules."
+}
+
+output "resource_group_name" {
+  value       = local.resource_group_name
+  description = "Resource group name for inherited modules."
 }
 
 output "location" {
