@@ -5,10 +5,16 @@
         "location": "polandcentral",
         "admins": ["ed6cdf7a-4076-443f-9d19-5a1e9432b3e1"]
       },
-      "storage": { "account_replication_type": "LRS" },
-      "keyvault": {
-        "soft_delete_retention_days": null,
-        "purge_protection_enabled": false
+      "storages": {
+        "storage1": {
+          "account_replication_type": "LRS"
+        }
+      },
+      "keyvaults": {
+        "keyvault1": {
+          "soft_delete_retention_days": null,
+          "purge_protection_enabled": false
+        }
       }
     }
   }

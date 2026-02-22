@@ -18,19 +18,19 @@ variable "config" {
     # ─────────────────────────────────────────────────────────────────────────
     # storage: Azure Storage Account (blueprint 01-storage)
     # ─────────────────────────────────────────────────────────────────────────
-    storage = optional(object({
+    storages = optional(map(object({
       name_override               = optional(string, "")          # Custom storage account name; auto-generated from prefix when empty
       account_tier                = optional(string, "Standard")  # Performance tier: Standard or Premium
       account_replication_type    = optional(string, "LRS")       # Redundancy: LRS | GRS | RAGRS | ZRS | GZRS | RAGZRS
       account_kind                = optional(string, "StorageV2") # Account kind: BlobStorage | BlockBlobStorage | FileStorage | Storage | StorageV2
       access_tier                 = optional(string, "Hot")       # Blob access tier: Hot or Cool
       allow_public_network_access = optional(bool, true)          # Set false to restrict access to private endpoints or VNet rules only
-    }), {})
+    })), null)
 
     # ─────────────────────────────────────────────────────────────────────────
     # keyvault: Azure Key Vault (blueprint 02-keyvault)
     # ─────────────────────────────────────────────────────────────────────────
-    keyvault = optional(object({
+    keyvaults = optional(map(object({
       name_override              = optional(string, "")   # Custom Key Vault name; auto-generated from prefix when empty
       soft_delete_retention_days = optional(number, 7)   # Days to retain soft-deleted secrets/keys/certs (7–90)
       purge_protection_enabled   = optional(bool, false) # Prevents permanent deletion until retention period expires
@@ -40,7 +40,7 @@ variable "config" {
         ip_rules                   = optional(list(string), [])        # Allowed IPv4 addresses or CIDR ranges
         virtual_network_subnet_ids = optional(list(string), [])        # Allowed subnet resource IDs
       }), {})
-    }), {})
+    })), null)
 
   })
 }
