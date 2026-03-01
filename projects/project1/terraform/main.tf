@@ -58,3 +58,25 @@ module "keyvault" {
 
   depends_on = [module.init] # Ensure init module runs first to create resource group
 }
+
+
+# ── 03-mssql: mssql server ─────────────────────────────────────────────────────
+
+module "mssql" {
+  for_each = var.config.mssql_servers != null ? var.config.mssql_servers : {} # Create one instance per mssql config, or skip if null
+
+  source = "../../../blueprints/03-mssql"
+
+  resource_group_name      = module.init.resource_group_name
+  location                 = module.init.location
+  resource_prefix          = module.init.resource_prefix
+  tags                     = module.init.tags
+
+  administrator_login           = each.value.administrator_login
+  administrator_login_password  = each.value.administrator_login_password
+  database_name                 = each.value.database_name
+  sku_name                      = each.value.sku_name
+  backup_retention_days         = each.value.backup_retention_days
+
+  depends_on = [module.init] # Ensure init module runs first to create resource group
+}
