@@ -1,0 +1,22 @@
+name: Deploy Project on PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      project-name:
+        description: "The name of the project to deploy"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+
+  deploy-terraform:
+    name: Deploy Terraform
+    needs: extract-and-deploy
+    uses: ./.github/workflows/terraform-deploy.yml
+    with:
+      project: ${{ inputs.project-name }}
+    secrets: inherit
