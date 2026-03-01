@@ -1,0 +1,28 @@
+{
+  "config": {
+    "init": {
+      "admins": [
+        "111111"
+      ],
+      "tags": {
+        "Project": "test4",
+        "Environment": "dev"
+      }
+    },
+    "storages": {
+      "tstkj": {
+        "access_tier": "Cool",
+        "name_override": "tstkj"
+      }
+    },
+    "mssql_servers": {
+      "testsql": {
+        "sku_name": "S2",
+        "administrator_login": "kamil",
+        "administrator_login_password": "kamilpass",
+        "database_name": "testdb",
+        "name_override": "testsql"
+      }
+    }
+  }
+}
