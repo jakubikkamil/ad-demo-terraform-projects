@@ -51,6 +51,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prepare binaries and tools
+        run: |
+          apt-get install -y unzip jq
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -260,6 +264,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Prepare binaries and tools
+        run: |
+          apt-get install -y unzip jq
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
