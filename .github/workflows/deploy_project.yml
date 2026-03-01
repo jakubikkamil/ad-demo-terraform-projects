@@ -1,5 +1,4 @@
-name: Deploy Project on PR
-
+name: Deploy Project
 on:
   workflow_dispatch:
     inputs:
@@ -12,10 +11,8 @@ permissions:
   pull-requests: read
 
 jobs:
-
   deploy-terraform:
     name: Deploy Terraform
-    needs: extract-and-deploy
     uses: ./.github/workflows/terraform-deploy.yml
     with:
       project: ${{ inputs.project-name }}
