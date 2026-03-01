@@ -1,0 +1,134 @@
+name: Deploy Project on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  extract-and-deploy:
+    name: Extract Project & Deploy
+    runs-on: self-hosted
+    outputs:
+      project-name: ${{ steps.extract-project.outputs.project-name }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Project Name from PR Title
+        id: extract-project
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+          
+          # Extract project name from format like "Project Onboarding: test4"
+          # Pattern: anything after "Project Onboarding:" or "project:" (case insensitive)
+          PROJECT=$(echo "$PR_TITLE" | sed -E 's/.*[Pp]roject[^:]*:\s*([a-zA-Z0-9_-]+).*/\1/')
+          
+          # Validate that we extracted something and it's not the original title
+          if [ "$PROJECT" = "$PR_TITLE" ]; then
+            echo "❌ ERROR: Could not extract project name from PR title"
+            echo "Expected format: 'Project Onboarding: <project-name>'"
+            echo "Got: $PR_TITLE"
+            exit 1
+          fi
+          
+          # Validate project name format (alphanumeric and hyphens/underscores)
+          if ! echo "$PROJECT" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+            echo "❌ ERROR: Invalid project name format: $PROJECT"
+            echo "Project name must contain only alphanumeric characters, hyphens, and underscores"
+            exit 1
+          fi
+          
+          echo "✅ Extracted project name: $PROJECT"
+          echo "project-name=$PROJECT" >> $GITHUB_OUTPUT
+
+      - name: Validate Project Exists
+        id: validate-project
+        run: |
+          PROJECT="${{ steps.extract-project.outputs.project-name }}"
+          echo "Validating project: $PROJECT"
+          
+          # Check if project directory exists
+          if [ ! -d "projects/$PROJECT" ]; then
+            echo "❌ ERROR: Project directory not found: projects/$PROJECT"
+            exit 1
+          fi
+          
+          # Check if terraform directory exists
+          if [ ! -d "projects/$PROJECT/terraform" ]; then
+            echo "❌ ERROR: Terraform directory not found: projects/$PROJECT/terraform"
+            exit 1
+          fi
+          
+          # Check if ENVVARS file exists
+          if [ ! -f "projects/$PROJECT/ENVVARS/$PROJECT.json" ]; then
+            echo "⚠️ WARNING: ENVVARS file not found: projects/$PROJECT/ENVVARS/$PROJECT.json"
+            echo "Continuing with deployment anyway..."
+          fi
+          
+          echo "✅ Project validation passed"
+
+      - name: Log Project Information
+        run: |
+          PROJECT="${{ steps.extract-project.outputs.project-name }}"
+          echo ""
+          echo "## 📋 Deployment Information"
+          echo ""
+          echo "**Project**: $PROJECT"
+          echo "**PR Number**: #${{ github.event.pull_request.number }}"
+          echo "**PR Title**: ${{ github.event.pull_request.title }}"
+          echo "**PR Author**: ${{ github.event.pull_request.user.login }}"
+          echo "**Target Branch**: ${{ github.event.pull_request.base.ref }}"
+          echo "**Source Branch**: ${{ github.event.pull_request.head.ref }}"
+          echo ""
+
+  # Call the terraform-deploy workflow with the extracted project name
+  deploy-terraform:
+    name: Deploy Terraform
+    needs: extract-and-deploy
+    uses: ./.github/workflows/terraform-deploy.yml
+    with:
+      project: ${{ needs.extract-and-deploy.outputs.project-name }}
+    secrets: inherit
+
+  # Summary job
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: self-hosted
+    needs: [extract-and-deploy, deploy-terraform]
+    if: always()
+    
+    steps:
+      - name: Deployment Status
+        run: |
+          echo "## 🎯 Deployment Summary"
+          echo ""
+          echo "**Project**: ${{ needs.extract-and-deploy.outputs.project-name }}"
+          echo "**Status**: ${{ needs.deploy-terraform.result }}"
+          echo "**PR**: #${{ github.event.pull_request.number }}"
+          echo ""
+          echo "### Results:"
+          echo "- Terraform Plan & Cost Analysis: ${{ needs.deploy-terraform.result }}"
+          echo "- Approval Gate: Ready for review"
+          echo "- Terraform Apply: Pending approval"
+          echo ""
+          echo "### Next Steps:"
+          echo "1. Review Terraform plan in Actions tab"
+          echo "2. Check cost estimates"
+          echo "3. Approve deployment when ready"
+          echo ""
+          echo "**Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+    outputs:
+      project-name: ${{ needs.extract-and-deploy.outputs.project-name }}

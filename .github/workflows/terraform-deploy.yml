@@ -1,13 +1,13 @@
 name: Terraform Plan & Deploy
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-     branches:
-      - project1
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      project:
+        description: 'Target project to deploy '
+        required: true
+        default: 'project1'
+        type: string
 
 concurrency:
   group: terraform-${{ github.ref }}
@@ -20,8 +20,6 @@ env:
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  # ARM_OIDC_TOKEN: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-  # ARM_OIDC_TOKEN_FILE_PATH: /tmp/oidc_token.jwt
 
 permissions:
   id-token: write
@@ -74,27 +72,27 @@ jobs:
       - name: Initialize Terraform
         id: init
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           terraform init -upgrade
           echo "✓ Terraform initialized successfully"
 
       - name: Validate Terraform Configuration
         id: validate
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           terraform validate
           echo "✓ Terraform configuration is valid"
 
       - name: Generate Terraform Plan
         id: plan
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           
           # Create temporary directory for plan artifacts
           mkdir -p /tmp/tf-artifacts
           
           # Generate plan file
-          terraform plan -var-file="../ENVVARS/project1.json" -lock=false -out=/tmp/tf-artifacts/tfplan.binary
+          terraform plan -var-file="../ENVVARS/${{ inputs.project }}.json" -lock=false -out=/tmp/tf-artifacts/tfplan.binary
           
           # Convert to JSON for infracost and PR comments
           terraform show -json /tmp/tf-artifacts/tfplan.binary > /tmp/tf-artifacts/tfplan.json
@@ -130,7 +128,7 @@ jobs:
       - name: Calculate Infrastructure Costs
         id: costs
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           
           # Run infracost on the terraform plan
           infracost breakdown \
@@ -148,6 +146,8 @@ jobs:
           # Generate cost summary
           COST_SUMMARY=$(jq -r ".summary | \"Est. Monthly Cost: \$\(.totalMonthlyCost)\"" /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "Cost calculation unavailable")
           echo "cost-summary=$COST_SUMMARY" >> $GITHUB_OUTPUT
+
+          echo "**Cost Estimate**: $COST_SUMMARY"
 
       - name: Generate PR Comment with Plan & Costs
         if: github.event_name == 'pull_request'
@@ -311,7 +311,7 @@ jobs:
       - name: Initialize Terraform
         id: init
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           terraform init -upgrade
           echo "✓ Terraform initialized for apply"
 
@@ -324,7 +324,7 @@ jobs:
       - name: Apply Terraform Configuration
         id: apply
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           
           # Verify plan exists
           if [ ! -f /tmp/tf-artifacts/tfplan.binary ]; then
@@ -355,7 +355,7 @@ jobs:
         id: outputs
         if: success()
         run: |
-          cd projects/project1/terraform
+          cd projects/${{ inputs.project }}/terraform
           
           # Save outputs
           terraform output -json > /tmp/tf-artifacts/outputs.json 2>/dev/null || true
