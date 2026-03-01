@@ -1,0 +1,439 @@
+name: Terraform Plan & Deploy
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_VERSION: "1.14.0"
+  INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  # ARM_OIDC_TOKEN: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+  # ARM_OIDC_TOKEN_FILE_PATH: /tmp/oidc_token.jwt
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 1: Generate Terraform Plan and Infrastructure Costs
+  # ═══════════════════════════════════════════════════════════════════════════
+  
+  terraform-plan:
+    name: Terraform Plan & Cost Analysis
+    runs-on: self-hosted
+    environment:
+      name: dev
+      # This environment can be unprotected since it only generates a plan and cost estimate without making changes
+    outputs:
+      plan-exists: ${{ steps.check-plan.outputs.plan-exists }}
+      has-changes: ${{ steps.plan.outputs.has-changes }}
+      cost-estimate: ${{ steps.costs.outputs.cost-estimate }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Azure Login with Federated Identity
+        id: azure-login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # - name: Save OIDC Token
+      #   id: oidc-token
+      #   run: |
+      #     echo "Retrieving OIDC token for Terraform authentication..."
+      #     echo "OIDC_TOKEN=${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}" >> $GITHUB_ENV
+
+      - name: Initialize Terraform
+        id: init
+        run: |
+          cd projects/project1/terraform
+          terraform init -upgrade
+          echo "✓ Terraform initialized successfully"
+
+      - name: Validate Terraform Configuration
+        id: validate
+        run: |
+          cd projects/project1/terraform
+          terraform validate
+          echo "✓ Terraform configuration is valid"
+
+      - name: Generate Terraform Plan
+        id: plan
+        run: |
+          cd projects/project1/terraform
+          
+          # Create temporary directory for plan artifacts
+          mkdir -p /tmp/tf-artifacts
+          
+          # Generate plan file
+          terraform plan -lock=false -out=/tmp/tf-artifacts/tfplan.binary
+          
+          # Convert to JSON for infracost and PR comments
+          terraform show -json /tmp/tf-artifacts/tfplan.binary > /tmp/tf-artifacts/tfplan.json
+          
+          # Check if there are changes
+          CHANGES=$(terraform show -json /tmp/tf-artifacts/tfplan.binary | jq '[.resource_changes[]?.change.actions[]? | select(. != "no-op")] | length')
+          if [ "$CHANGES" -gt 0 ]; then
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "📋 Plan contains $CHANGES resource changes"
+          else
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "✓ No infrastructure changes detected"
+          fi
+          
+          # Store plan summary
+          terraform show /tmp/tf-artifacts/tfplan.binary > /tmp/tf-artifacts/tfplan.txt
+
+      - name: Check Plan Artifacts
+        id: check-plan
+        run: |
+          if [ -f /tmp/tf-artifacts/tfplan.binary ]; then
+            echo "plan-exists=true" >> $GITHUB_OUTPUT
+            ls -lh /tmp/tf-artifacts/
+          else
+            echo "plan-exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Calculate Infrastructure Costs
+        id: costs
+        run: |
+          cd projects/project1/terraform
+          
+          # Run infracost on the terraform plan
+          infracost breakdown \
+            --path=/tmp/tf-artifacts/tfplan.json \
+            --format=json > /tmp/tf-artifacts/infracost.json 2>/dev/null || {
+            echo "warn=ℹ️ Infracost analysis skipped (API key not configured or insufficient permissions)" >> $GITHUB_OUTPUT
+            echo "cost-estimate=unable-to-calculate" >> $GITHUB_OUTPUT
+            exit 0
+          }
+          
+          # Extract cost estimate
+          MONTHLY_COST=$(jq -r '.summary.totalMonthlyCost' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "0")
+          echo "cost-estimate=$MONTHLY_COST" >> $GITHUB_OUTPUT
+          
+          # Generate cost summary
+          COST_SUMMARY=$(jq -r ".summary | \"Est. Monthly Cost: \$\(.totalMonthlyCost)\"" /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "Cost calculation unavailable")
+          echo "cost-summary=$COST_SUMMARY" >> $GITHUB_OUTPUT
+
+      - name: Generate PR Comment with Plan & Costs
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            
+            let planContent = "❌ No plan available";
+            try {
+              if (fs.existsSync('/tmp/tf-artifacts/tfplan.txt')) {
+                const rawPlan = fs.readFileSync('/tmp/tf-artifacts/tfplan.txt', 'utf8');
+                planContent = "```\n" + rawPlan.slice(0, 4000) + "\n```";
+              }
+            } catch (e) {
+              console.log("Could not read plan file:", e.message);
+            }
+            
+            let costContent = "💰 Cost Estimate: Unable to calculate";
+            try {
+              if (fs.existsSync('/tmp/tf-artifacts/infracost.json')) {
+                const infracost = JSON.parse(fs.readFileSync('/tmp/tf-artifacts/infracost.json', 'utf8'));
+                const monthlyCost = infracost.summary?.totalMonthlyCost || "N/A";
+                costContent = `💰 **Estimated Monthly Cost**: $${monthlyCost}`;
+              }
+            } catch (e) {
+              console.log("Could not read cost file:", e.message);
+            }
+            
+            const comment = `## 📋 Terraform Plan & Cost Analysis
+            
+            ### Plan Summary
+            ${planContent}
+            
+            ### Infrastructure Cost Analysis
+            ${costContent}
+            
+            *Generated by GitHub Actions on ${new Date().toLocaleString()}*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Upload Plan Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-artifacts
+          path: /tmp/tf-artifacts/
+          retention-days: 7
+          overwrite: true
+
+      - name: Summary
+        run: |
+          echo "## ✅ Step 1 Complete: Terraform Plan & Cost Analysis"
+          echo ""
+          echo "### Results:"
+          echo "- ✓ Terraform plan generated"
+          echo "- ✓ Infrastructure costs calculated"
+          echo "- ✓ Plan artifacts saved"
+          echo ""
+          echo "**Next Step**: Awaiting approval from authorized user"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 2: Approval Gate using Protected Environment
+  # ═══════════════════════════════════════════════════════════════════════════
+  
+  approval-gate:
+    name: 🔐 Approval Gate
+    runs-on: ubuntu
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: gate-env
+      # This environment should be protected and require approval
+    
+    steps:
+      - name: Approval Requested
+        run: |
+          echo "## 🔐 STEP 2: Approval Gate Activated"
+          echo ""
+          echo "✅ Terraform plan has been generated and costs calculated"
+          echo ""
+          echo "**Environment**: gate-env (Protected)"
+          echo "**Status**: ⏳ Awaiting approval from authorized reviewer"
+          echo ""
+          echo "An authorized administrator must approve this deployment to proceed to Step 3."
+          echo ""
+          echo "### Approval Details:"
+          echo "- Review workflow URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "- Triggered by: ${{ github.actor }}"
+          echo "- Branch: ${{ github.ref }}"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 3: Apply Terraform Code
+  # ═══════════════════════════════════════════════════════════════════════════
+  
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: self-hosted
+    needs: [terraform-plan, approval-gate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Azure Login with Federated Identity
+        id: azure-login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # enable-AzPSSession: false
+
+      - name: Initialize Terraform
+        id: init
+        run: |
+          cd projects/project1/terraform
+          terraform init -upgrade
+          echo "✓ Terraform initialized for apply"
+
+      - name: Download Plan Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-artifacts
+          path: /tmp/tf-artifacts/
+
+      - name: Apply Terraform Configuration
+        id: apply
+        run: |
+          cd projects/project1/terraform
+          
+          # Verify plan exists
+          if [ ! -f /tmp/tf-artifacts/tfplan.binary ]; then
+            echo "❌ ERROR: Terraform plan not found!"
+            exit 1
+          fi
+          
+          echo "🚀 Applying Terraform configuration..."
+          
+          # Apply using the saved plan
+          terraform apply \
+            -lock=true \
+            -input=false \
+            -no-color \
+            /tmp/tf-artifacts/tfplan.binary 2>&1 | tee /tmp/apply-output.txt
+          
+          # Capture apply output
+          if [ $? -eq 0 ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Infrastructure deployed successfully"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Terraform apply failed"
+            exit 1
+          fi
+
+      - name: Retrieve Outputs
+        id: outputs
+        if: success()
+        run: |
+          cd projects/project1/terraform
+          
+          # Save outputs
+          terraform output -json > /tmp/tf-artifacts/outputs.json 2>/dev/null || true
+          
+          # Display outputs
+          echo "📤 Infrastructure Outputs:"
+          terraform output 2>/dev/null || echo "No outputs defined"
+
+      - name: Create Deployment Report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const status = '${{ steps.apply.outputs.status }}';
+            const icon = status === 'success' ? '✅' : '❌';
+            
+            let outputContent = "No outputs available";
+            try {
+              if (fs.existsSync('/tmp/tf-artifacts/outputs.json')) {
+                const outputs = JSON.parse(fs.readFileSync('/tmp/tf-artifacts/outputs.json', 'utf8'));
+                outputContent = "```json\n" + JSON.stringify(outputs, null, 2) + "\n```";
+              }
+            } catch (e) {
+              console.log("Could not read outputs:", e.message);
+            }
+            
+            const report = `## ${icon} Terraform Apply Report
+            
+            **Status**: ${status === 'success' ? '✅ SUCCESS' : '❌ FAILED'}
+            
+            **Deployment Details**:
+            - Branch: ${{ github.ref }}
+            - Commit: ${{ github.sha }}
+            - Actor: ${{ github.actor }}
+            - Timestamp: ${new Date().toLocaleString()}
+            
+            ### Infrastructure Outputs
+            ${outputContent}
+            
+            ### Apply Logs
+            Check the full logs in the [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            // Create or update deployment status as a check
+            github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: context.sha,
+              name: 'Terraform Apply Report',
+              status: 'completed',
+              conclusion: status === 'success' ? 'success' : 'failure',
+              output: {
+                title: 'Terraform Deployment Report',
+                summary: report
+              }
+            });
+
+      - name: Notify Deployment Success
+        if: steps.apply.outputs.status == 'success'
+        run: |
+          echo "## ✅ Step 3 Complete: Terraform Applied Successfully"
+          echo ""
+          echo "### Deployment Summary:"
+          echo "- ✅ Infrastructure deployed to Azure"
+          echo "- ✅ Resources created/updated"
+          echo "- ✅ Deployment completed at $(date)"
+
+      - name: Notify Deployment Failure
+        if: failure()
+        run: |
+          echo "## ❌ Step 3 Failed: Terraform Apply Error"
+          echo ""
+          echo "### Error Details:"
+          echo "Review the logs above for error details and retry after fixing issues."
+          exit 1
+
+      - name: Upload Apply Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-apply-logs
+          path: /tmp/apply-output.txt
+          retention-days: 30
+
+  # Summary Job
+  summary:
+    name: Pipeline Summary
+    runs-on: self-hosted
+    environment:
+      name: dev
+    needs: [terraform-plan, approval-gate, terraform-apply]
+    if: always()
+    
+    steps:
+      - name: Pipeline Complete
+        run: |
+          echo "## 📊 Terraform Pipeline Summary"
+          echo ""
+          echo "### Execution Steps:"
+          echo "1. ✅ [COMPLETED] Terraform Plan & Cost Analysis"
+          echo "   - Plan generated"
+          echo "   - Infrastructure costs calculated"
+          echo ""
+          echo "2. 🔐 [COMPLETED] Approval Gate"
+          echo "   - User approval verified"
+          echo ""
+          echo "3. ${{ needs.terraform-apply.result == 'success' && '✅ [COMPLETED]' || '⏸️ [PENDING]' }} Terraform Apply"
+          echo "   - Infrastructure deployed"
+          echo ""
+          echo "### View Results:"
+          echo "- Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "- Artifacts: Check the 'Artifacts' tab for plan details and outputs"

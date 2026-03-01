@@ -5,15 +5,16 @@ variable "config" {
     # ─────────────────────────────────────────────────────────────────────────
     # init: shared defaults consumed by all modules via module.init outputs
     # ─────────────────────────────────────────────────────────────────────────
-    init = optional(object({
-      tags            = optional(map(string), { Environment = "dev", Project = "ad-demo", ManagedBy = "terraform" }) # Tags propagated to every resource
-      resource_prefix = optional(string, "addemo")     # Short prefix used to generate all resource names
-      location        = optional(string, "westeurope") # Azure region for all resources
-      admins          = optional(list(string), [])     # Object IDs granted admin permissions (e.g. Key Vault Administrator)
-      readers         = optional(list(string), [])     # Object IDs granted read-only permissions
-      data_writers    = optional(list(string), [])     # Object IDs granted data-plane write permissions
-      data_readers    = optional(list(string), [])     # Object IDs granted data-plane read permissions
-    }), {})
+    init = object({
+      tags            = object({ Environment = string, Project = string, ManagedBy = optional(string, "terraform") }) # Tags propagated to every resource
+      resource_prefix = optional(string, "addemo")     # Short prefix used to generate all resource names. If not provided, convert Project name from tags to lowercase and remove non-alphanumeric characters (e.g. "ad-demo" → "addemo")
+      location        = optional(string, "centralpoland") # Azure region for all resources
+      #User needs to have at least Reader role on the subscription to use this module, but for better experience it's recommended to have Owner or User Access Administrator role to avoid permission issues when assigning roles to created resources. If the user doesn't have sufficient permissions, they can provide an existing object ID with admin permissions (e.g. Key Vault Administrator) in the "admins" list below.
+      admins          = list(string), []   # Object IDs granted admin permissions (e.g. Key Vault Administrator)
+      readers         = optional(list(string), [])   # Object IDs granted read-only permissions
+      data_writers    = optional(list(string), [])   # Object IDs granted data-plane write permissions
+      data_readers    = optional(list(string), [])   # Object IDs granted data-plane read permissions
+    })
     
     # ─────────────────────────────────────────────────────────────────────────
     # storage: Azure Storage Account (blueprint 01-storage)
@@ -23,7 +24,7 @@ variable "config" {
       account_tier                = optional(string, "Standard")  # Performance tier: Standard or Premium
       account_replication_type    = optional(string, "LRS")       # Redundancy: LRS | GRS | RAGRS | ZRS | GZRS | RAGZRS
       account_kind                = optional(string, "StorageV2") # Account kind: BlobStorage | BlockBlobStorage | FileStorage | Storage | StorageV2
-      access_tier                 = optional(string, "Hot")       # Blob access tier: Hot or Cool
+      access_tier                 = string                        # Blob access tier: Hot or Cool
       allow_public_network_access = optional(bool, true)          # Set false to restrict access to private endpoints or VNet rules only
     })), null)
 
