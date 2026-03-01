@@ -140,14 +140,11 @@ jobs:
           }
           
           # Extract cost estimate
-          MONTHLY_COST=$(jq -r '.summary.totalMonthlyCost' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "0")
+          MONTHLY_COST=$(jq -r '.totalMonthlyCost // 0' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "0")
           echo "cost-estimate=$MONTHLY_COST" >> $GITHUB_OUTPUT
-          
-          # Generate cost summary
-          COST_SUMMARY=$(jq -r ".summary | \"Est. Monthly Cost: \$\(.totalMonthlyCost)\"" /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "Cost calculation unavailable")
-          echo "cost-summary=$COST_SUMMARY" >> $GITHUB_OUTPUT
+        
 
-          echo "**Cost Estimate**: $COST_SUMMARY"
+          echo "**Cost Estimate**: $MONTHLY_COST"
 
       - name: Generate PR Comment with Plan & Costs
         if: github.event_name == 'pull_request'
@@ -171,7 +168,7 @@ jobs:
             try {
               if (fs.existsSync('/tmp/tf-artifacts/infracost.json')) {
                 const infracost = JSON.parse(fs.readFileSync('/tmp/tf-artifacts/infracost.json', 'utf8'));
-                const monthlyCost = infracost.summary?.totalMonthlyCost || "N/A";
+                const monthlyCost = infracost.totalMonthlyCost || "N/A";
                 costContent = `💰 **Estimated Monthly Cost**: $${monthlyCost}`;
               }
             } catch (e) {
