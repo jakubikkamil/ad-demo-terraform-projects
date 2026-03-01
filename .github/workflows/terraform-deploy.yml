@@ -1,12 +1,12 @@
 name: Terraform Plan & Deploy
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  # push:
-  #   branches:
-  #     - main
+  pull_request:
+    branches:
+      - main
+  push:
+     branches:
+      - project1
   workflow_dispatch:
 
 concurrency:
@@ -94,7 +94,7 @@ jobs:
           mkdir -p /tmp/tf-artifacts
           
           # Generate plan file
-          terraform plan -lock=false -out=/tmp/tf-artifacts/tfplan.binary
+          terraform plan -var-file="../ENVVARS/project1.json" -lock=false -out=/tmp/tf-artifacts/tfplan.binary
           
           # Convert to JSON for infracost and PR comments
           terraform show -json /tmp/tf-artifacts/tfplan.binary > /tmp/tf-artifacts/tfplan.json
@@ -221,14 +221,46 @@ jobs:
   
   approval-gate:
     name: 🔐 Approval Gate
-    runs-on: ubuntu
+    runs-on: self-hosted
     needs: terraform-plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    #if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: gate-env
       # This environment should be protected and require approval
     
     steps:
+      - name: Download Plan Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan-artifacts
+          path: /tmp/tf-artifacts/
+
+      - name: Display Cost Calculations
+        id: display-costs
+        run: |
+          echo "## 💰 Infrastructure Cost Analysis"
+          echo ""
+          
+          if [ -f /tmp/tf-artifacts/infracost.json ]; then
+            echo "### Cost Breakdown:"
+            echo ""
+            
+            # Extract and display total monthly cost
+            TOTAL_COST=$(jq -r '.summary.totalMonthlyCost' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "N/A")
+            echo "**Total Estimated Monthly Cost**: \$$TOTAL_COST"
+            echo ""
+            
+            # Display resource costs
+            echo "### Resource Costs:"
+            jq -r '.breakdown.resources[] | select(.startsWith("azurerm_") or true) | "\(.name): \(.monthlyCost)"' /tmp/tf-artifacts/infracost.json 2>/dev/null | head -20 || echo "Cost details available"
+            echo ""
+            
+            # Display summary
+            jq -r '.summary | "• Prior: $\(.priorMonthlyCost)\n• Current: $\(.totalMonthlyCost)\n• Diff: $\(.totalMonthlyCostDiff)"' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "Cost summary unavailable"
+          else
+            echo "⚠️ Cost estimation file not found"
+          fi
+
       - name: Approval Requested
         run: |
           echo "## 🔐 STEP 2: Approval Gate Activated"
@@ -253,7 +285,7 @@ jobs:
     name: Terraform Apply
     runs-on: self-hosted
     needs: [terraform-plan, approval-gate]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    #if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: dev
     
@@ -364,23 +396,7 @@ jobs:
             
             ### Infrastructure Outputs
             ${outputContent}
-            
-            ### Apply Logs
-            Check the full logs in the [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
-            
-            // Create or update deployment status as a check
-            github.rest.checks.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head_sha: context.sha,
-              name: 'Terraform Apply Report',
-              status: 'completed',
-              conclusion: status === 'success' ? 'success' : 'failure',
-              output: {
-                title: 'Terraform Deployment Report',
-                summary: report
-              }
-            });
+
 
       - name: Notify Deployment Success
         if: steps.apply.outputs.status == 'success'
