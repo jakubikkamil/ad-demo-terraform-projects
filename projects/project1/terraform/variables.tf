@@ -10,7 +10,7 @@ variable "config" {
       resource_prefix = optional(string, "addemo")     # Short prefix used to generate all resource names. If not provided, convert Project name from tags to lowercase and remove non-alphanumeric characters (e.g. "ad-demo" → "addemo")
       location        = optional(string, "centralpoland") # Azure region for all resources
       #User needs to have at least Reader role on the subscription to use this module, but for better experience it's recommended to have Owner or User Access Administrator role to avoid permission issues when assigning roles to created resources. If the user doesn't have sufficient permissions, they can provide an existing object ID with admin permissions (e.g. Key Vault Administrator) in the "admins" list below.
-      admins          = list(string), []   # Object IDs granted admin permissions (e.g. Key Vault Administrator)
+      admins          = list(string), # Object IDs granted admin permissions (e.g. Key Vault Administrator)
       readers         = optional(list(string), [])   # Object IDs granted read-only permissions
       data_writers    = optional(list(string), [])   # Object IDs granted data-plane write permissions
       data_readers    = optional(list(string), [])   # Object IDs granted data-plane read permissions

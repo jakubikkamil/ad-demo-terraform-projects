@@ -1,12 +1,17 @@
 {
     "config": {
       "init": {
+        "tags": {
+          "Environment": "dev",
+          "Project": "project1"
+        },
         "resource_prefix": "proj1",
         "location": "polandcentral",
         "admins": ["ed6cdf7a-4076-443f-9d19-5a1e9432b3e1"]
       },
       "storages": {
         "storage1": {
+          "access_tier": "Hot",
           "account_replication_type": "LRS"
         }
       },
