@@ -7,6 +7,7 @@ on:
         description: 'Target project to deploy '
         required: true
         default: 'project1'
+        type: string
 
 concurrency:
   group: terraform-${{ github.ref }}
