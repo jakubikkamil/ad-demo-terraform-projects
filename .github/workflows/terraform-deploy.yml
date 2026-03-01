@@ -92,7 +92,7 @@ jobs:
           mkdir -p /tmp/tf-artifacts
           
           # Generate plan file
-          terraform plan -var-file="../ENVVARS/${{ inputs.project }}.json" -lock=false -out=/tmp/tf-artifacts/tfplan.binary
+          terraform plan -no-color -var-file="../ENVVARS/${{ inputs.project }}.json" -lock=false -out=/tmp/tf-artifacts/tfplan.binary
           
           # Convert to JSON for infracost and PR comments
           terraform show -json /tmp/tf-artifacts/tfplan.binary > /tmp/tf-artifacts/tfplan.json
@@ -161,7 +161,7 @@ jobs:
             let planText = "";
             try {
               if (fs.existsSync('/tmp/tf-artifacts/tfplan.txt')) {
-                planText = fs.readFileSync('/tmp/tf-artifacts/tfplan.txt', 'utf8').slice(0, 2000);
+                planText = fs.readFileSync('/tmp/tf-artifacts/tfplan.txt', 'utf8');
               }
             } catch (e) {
               console.log("Could not read plan file:", e.message);
