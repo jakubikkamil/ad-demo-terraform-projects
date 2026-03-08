@@ -1,0 +1,17 @@
+{
+  "init": {
+    "tags": {
+      "Environment": "dev",
+      "Project": "test1",
+      "ManagedBy": "terraform"
+    },
+    "resource_prefix": "test1",
+    "location": "centralpoland",
+    "admins": [
+      "11111"
+    ],
+    "readers": [],
+    "data_writers": [],
+    "data_readers": []
+  }
+}
