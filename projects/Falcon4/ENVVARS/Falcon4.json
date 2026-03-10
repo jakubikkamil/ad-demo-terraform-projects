@@ -7,7 +7,6 @@
         "ManagedBy": "terraform"
       },
       "resource_prefix": "falcon3",
-      "location": "centralpoland",
       "admins": [],
       "readers": [],
       "data_writers": [],
