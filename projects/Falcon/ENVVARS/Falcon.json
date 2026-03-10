@@ -1,0 +1,12 @@
+{
+  "init": {
+    "tags": {
+      "Environment": "Dev",
+      "ManagedBy": "terraform",
+      "Project": "Falcon"
+    },
+    "admins": [
+      "2222"
+    ]
+  }
+}
