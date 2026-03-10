@@ -1,0 +1,17 @@
+{
+  "init": {
+    "tags": {
+      "Environment": "dev",
+      "Project": "Falcon3",
+      "ManagedBy": "terraform"
+    },
+    "resource_prefix": "falcon2",
+    "location": "centralpoland",
+    "admins": [],
+    "readers": [],
+    "data_writers": [],
+    "data_readers": []
+  },
+  "storages": null,
+  "keyvaults": null
+}
