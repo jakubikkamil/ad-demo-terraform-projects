@@ -141,6 +141,7 @@ jobs:
           
           # Extract cost estimate
           MONTHLY_COST=$(jq -r '.totalMonthlyCost // 0' /tmp/tf-artifacts/infracost.json 2>/dev/null || echo "0")
+          MONTHLY_COST=$(printf "%.2f" "$MONTHLY_COST")
           echo "monthly-cost=$MONTHLY_COST" >> $GITHUB_OUTPUT
         
 
