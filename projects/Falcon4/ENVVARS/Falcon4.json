@@ -1,0 +1,28 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "Falcon4",
+        "ManagedBy": "terraform"
+      },
+      "resource_prefix": "falcon3",
+      "location": "centralpoland",
+      "admins": [],
+      "readers": [],
+      "data_writers": [],
+      "data_readers": []
+    },
+    "storages": {
+      "storage_account_1": {
+        "name_override": "",
+        "account_tier": "Standard",
+        "account_replication_type": "LRS",
+        "account_kind": "StorageV2",
+        "access_tier": "Hot",
+        "allow_public_network_access": true
+      }
+    },
+    "keyvaults": {}
+  }
+}
