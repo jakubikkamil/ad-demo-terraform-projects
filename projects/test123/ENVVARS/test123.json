@@ -1,0 +1,12 @@
+{
+  "admins": [
+    "11111"
+  ],
+  "tags": {
+    "Environment": "dev",
+    "Project": "test123",
+    "ManagedBy": "terraform"
+  },
+  "resource_prefix": "test123",
+  "location": "centralpoland"
+}
