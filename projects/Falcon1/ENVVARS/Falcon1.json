@@ -1,0 +1,22 @@
+{
+  "init": {
+    "tags": {
+      "Environment": "Development",
+      "Project": "Falcon1",
+      "ManagedBy": "terraform"
+    },
+    "resource_prefix": "falcon1",
+    "location": "centralpoland",
+    "admins": [
+      "111"
+    ]
+  },
+  "storages": {
+    "storage1": {
+      "access_tier": "Hot",
+      "account_tier": "Standard",
+      "account_replication_type": "LRS",
+      "account_kind": "StorageV2"
+    }
+  }
+}
