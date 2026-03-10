@@ -1,0 +1,22 @@
+{
+  "init": {
+    "tags": {
+      "Environment": "dev",
+      "Project": "Falcon2",
+      "ManagedBy": "terraform"
+    },
+    "resource_prefix": "falcon2",
+    "location": "centralpoland",
+    "admins": [
+      "111"
+    ],
+    "readers": [],
+    "data_writers": [],
+    "data_readers": []
+  },
+  "storages": {
+    "storage1": {
+      "access_tier": "Hot"
+    }
+  }
+}
