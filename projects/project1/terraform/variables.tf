@@ -7,14 +7,16 @@ variable "config" {
     # ─────────────────────────────────────────────────────────────────────────
     init = object({
       tags            = object({ Environment = string, Project = string, ManagedBy = optional(string, "terraform") }) # USER NEEDS TO PROVIDE REQUIRED TAGS. Environment and Project tags are required for resource naming and organization. ENVIRONMENT shoiuld have only 3 letters (e.g. "dev", "uat", "prd"). ManagedBy tag is optional and defaults to "terraform".
-      resource_prefix = optional(string, "addemo")     # DO NOT ASK USER FOR THAT. CREATE IT FROM PROJECT NAME with maximum 8 character long. Short prefix used to generate all resource names. If not provided, convert Project name from tags to lowercase and remove non-alphanumeric characters (e.g. "ad-demo" → "addemo")
+      resource_prefix = string,    # DO NOT ASK USER. CREATE IT FROM PROJECT NAME with maximum 8 character long. Short prefix used to generate all resource names. If not provided, convert Project name from tags to lowercase and remove non-alphanumeric characters (e.g. "ad-demo" → "addemo")
       location        = optional(string, "polandcentral") # DO NOT ASK USER FOR THAT. Azure region for all resources. 
       #User needs to have at least Reader role on the subscription to use this module, but for better experience it's recommended to have Owner or User Access Administrator role to avoid permission issues when assigning roles to created resources. If the user doesn't have sufficient permissions, they can provide an existing object ID with admin permissions (e.g. Key Vault Administrator) in the "admins" list below.
       admins          = list(string), # REQUIRED. NEEDS TO BE VALID FORMAT. Object IDs granted admin permissions. The Azure format of object ID e.g. "f7856123-6546-428d-b1a0-901fac478f8a" Example Azure Object ID (UUID v4 format). Number of characters should be 36 (including hyphens). Format also should match regex pattern: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+      readers         = optional(list(string)), # ASK but not Required. NEEDS TO BE VALID FORMAT. Object IDs granted admin permissions. The Azure format of object ID e.g. "f7856123-6546-428d-b1a0-901fac478f8a" Example Azure Object ID (UUID v4 format). Number of characters should be 36 (including hyphens). Format also should match regex pattern: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
       data_writers    = optional(list(string), [])   # ASK but not Required. Object IDs granted data-plane write permissions. The Azure format of object ID e.g. "f7856123-6546-428d-b1a0-901fac478f8a" Example Azure Object ID (UUID v4 format).  Number of characters should be 36 (including hyphens). Format also should match regex pattern: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
       data_readers    = optional(list(string), [])   # ASK but not Required. Object IDs granted data-plane read permissions. The Azure format of object ID e.g. "f7856123-6546-428d-b1a0-901fac478f8a" Example Azure Object ID (UUID v4 format).  Number of characters should be 36 (including hyphens). Format also should match regex pattern: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
     })
     
+    # Azure RESOURCE CONFIGURATION
     # ─────────────────────────────────────────────────────────────────────────
     # storage: Azure Storage Account (blueprint 01-storage)
     # ─────────────────────────────────────────────────────────────────────────
@@ -26,7 +28,8 @@ variable "config" {
       access_tier                 = string                        # REQUIRED. Blob access tier: Hot or Cool
       allow_public_network_access = optional(bool, true)          # DO NOT ASK USER FOR THAT. FOR NOW ONLY PUBLIC IS SUPPORTED. Set false to restrict access to private endpoints or VNet rules only
     })), null)
-
+    
+    # Azure RESOURCE CONFIGURATION
     # ─────────────────────────────────────────────────────────────────────────
     # keyvault: Azure Key Vault (blueprint 02-keyvault)
     # ─────────────────────────────────────────────────────────────────────────
