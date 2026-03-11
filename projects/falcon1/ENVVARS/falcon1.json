@@ -1,0 +1,20 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "falcon1"
+      },
+      "admins": [
+        "f7856123-6546-428d-b1a0-901fac478f8"
+      ]
+    },
+    "storages": {
+      "storage1": {
+        "access_tier": "Hot",
+        "account_replication_type": "LRS"
+      }
+    },
+    "keyvaults": {}
+  }
+}
