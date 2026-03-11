@@ -45,11 +45,12 @@ variable "config" {
       }), {})
     })), null)
 
-
+    # Azure RESOURCE CONFIGURATION
+    # ─────────────────────────────────────────────────────────────────────────
+    # MSSQL: Azure SQL Database (blueprint 03-mssql) REQUIRES KEY VAULT ID TO STORE ADMIN CREDENTIALS
+    # ─────────────────────────────────────────────────────────────────────────
     mssql_servers = optional(map(object({
       name_override                  = optional(string, "")           # Custom SQL Server name; auto-generated from prefix when empty
-      administrator_login            = string                         # SQL Server admin username (e.g. "sqladmin")
-      administrator_login_password   = string                         # SQL Server admin password (must meet complexity requirements)
       database_name                  = string                         # Initial database name to create (e.g. "maindb")
       sku_name                       = string                         # Pricing tier: S0, S1, S2, S3 (Standard); P1, P2, P3 (Premium); GP_Gen5_2, GP_Gen5_4, GP_Gen5_8 (General Purpose); BC_Gen5_2, BC_Gen5_4, BC_Gen5_8 (Business Critical)
       backup_retention_days          = optional(number, 7)            # Backup retention period in days (7–35 for Basic, 7–35 for Standard, 7–35 for Premium)

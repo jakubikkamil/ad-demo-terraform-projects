@@ -25,6 +25,57 @@
 #     sku_name                 = "S1"  # Standard tier
 #   }
 # ═══════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+# Random Administrator Credentials
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+# Naming convention for SQL Server
+locals {
+  prefix_clean   = replace(lower(var.resource_prefix), "/[^a-z0-9]/", "")
+  base_name      = var.name_override != "" ? lower(replace(var.name_override, "/[^a-z0-9]/", "")) : "${local.prefix_clean}sql"
+  # SQL Server names: 3-63 chars, lowercase alphanumeric and hyphens
+  sql_server_name = substr("${local.base_name}-${substr(md5("${var.resource_group_name}-${var.location}"), 0, 8)}", 0, 63)
+}
+
+
+# Generate random administrator login
+resource "random_string" "sql_admin_login" {
+  length  = 16
+  special = false
+  upper   = true
+  lower   = true
+  numeric = true
+}
+
+# Generate random administrator password
+ephemeral "random_password" "sql_admin_password" {
+  length            = 32
+  special           = true
+  override_special  = "!@#$%^&*()_+-=[]{}?:,./<>|"
+  min_upper         = 4
+  min_lower         = 4
+  min_numeric       = 4
+  min_special       = 4
+}
+
+# Store login in Key Vault
+ephemeral "azurerm_key_vault_secret" "sql_admin_login" {
+  name         = "${local.base_name}-admin-login"
+  value        = random_string.sql_admin_login.result
+  key_vault_id = var.key_vault_id
+
+  depends_on = [random_string.sql_admin_login]
+}
+
+# Store password in Key Vault
+ephemeral "azurerm_key_vault_secret" "sql_admin_password" {
+  name         = "${local.base_name}-admin-password"
+  value        = random_password.sql_admin_password.result
+  key_vault_id = var.key_vault_id
+
+  depends_on = [random_password.sql_admin_password]
+}
 
 # Azure SQL Server
 resource "azurerm_mssql_server" "this" {
@@ -105,10 +156,3 @@ resource "azurerm_mssql_database" "this" {
 }
 
 
-# Naming convention for SQL Server
-locals {
-  prefix_clean   = replace(lower(var.resource_prefix), "/[^a-z0-9]/", "")
-  base_name      = var.name_override != "" ? lower(replace(var.name_override, "/[^a-z0-9]/", "")) : "${local.prefix_clean}sql"
-  # SQL Server names: 3-63 chars, lowercase alphanumeric and hyphens
-  sql_server_name = substr("${local.base_name}-${substr(md5("${var.resource_group_name}-${var.location}"), 0, 8)}", 0, 63)
-}

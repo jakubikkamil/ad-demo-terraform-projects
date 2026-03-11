@@ -49,32 +49,6 @@ variable "server_version" {
   }
 }
 
-variable "administrator_login" {
-  type        = string
-  description = "The administrator login name for the new server."
-  sensitive   = false
-
-  validation {
-    condition     = can(regex("^[a-zA-Z_][a-zA-Z0-9_]{0,127}$", var.administrator_login))
-    error_message = "Administrator login must start with letter or underscore and contain only alphanumeric characters and underscores."
-  }
-}
-
-variable "administrator_login_password" {
-  type        = string
-  description = "The password associated with the administrator_login user. Must be between 8 and 128 characters, contain uppercase, lowercase, numeric, and special characters."
-  sensitive   = true
-
-  validation {
-    condition = length(var.administrator_login_password) >= 8 && (
-      can(regex("[A-Z]", var.administrator_login_password)) &&
-      can(regex("[a-z]", var.administrator_login_password)) &&
-      can(regex("[0-9]", var.administrator_login_password)) &&
-      can(regex("[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,./<>?]", var.administrator_login_password))
-    )
-    error_message = "Password must be 8-128 characters with uppercase, lowercase, numeric, and special characters."
-  }
-}
 
 variable "minimum_tls_version" {
   type        = string
@@ -314,4 +288,13 @@ variable "tde_key_vault_key_id" {
   type        = string
   description = "The URL of the Key Vault key to use for Transparent Data Encryption. Leave empty to use Microsoft-managed key."
   default     = ""
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Keyvautl id for storing SQL admin credentials
+# ─────────────────────────────────────────────────────────────────────────
+variable "key_vault_id" {
+  type        = string
+  description = "The resource ID of the Key Vault to store SQL admin credentials."
 }

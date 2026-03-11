@@ -23,8 +23,6 @@
       },
       "mssql_servers": {
         "sqlserver1": {
-          "administrator_login": "sqladmin",
-          "administrator_login_password": "ChangeMe@123456!",
           "database_name": "maindb",
           "sku_name": "S2",
           "backup_retention_days": 7

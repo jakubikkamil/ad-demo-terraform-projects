@@ -72,8 +72,7 @@ module "mssql" {
   resource_prefix          = module.init.resource_prefix
   tags                     = module.init.tags
 
-  administrator_login           = each.value.administrator_login
-  administrator_login_password  = each.value.administrator_login_password
+  keyvault_id              = module.keyvault[keys(module.keyvault)[0]].key_vault_id
   database_name                 = each.value.database_name
   sku_name                      = each.value.sku_name
   backup_retention_days         = each.value.backup_retention_days
