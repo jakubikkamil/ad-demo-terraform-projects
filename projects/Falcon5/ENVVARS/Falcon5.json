@@ -1,0 +1,42 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "Falcon5",
+        "ManagedBy": "terraform"
+      },
+      "resource_prefix": "falcon5",
+      "location": "centralpoland",
+      "admins": [
+        "111"
+      ],
+      "readers": [],
+      "data_writers": [],
+      "data_readers": []
+    },
+    "storages": {
+      "default": {
+        "name_override": "",
+        "account_tier": "Standard",
+        "account_replication_type": "LRS",
+        "account_kind": "StorageV2",
+        "access_tier": "Hot",
+        "allow_public_network_access": true
+      }
+    },
+    "keyvaults": {
+      "default": {
+        "name_override": "",
+        "soft_delete_retention_days": 7,
+        "purge_protection_enabled": false,
+        "network_acls": {
+          "bypass": "AzureServices",
+          "default_action": "Allow",
+          "ip_rules": [],
+          "virtual_network_subnet_ids": []
+        }
+      }
+    }
+  }
+}
