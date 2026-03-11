@@ -16,6 +16,7 @@ variable "config" {
       data_readers    = optional(list(string), [])   # ASK but not Required. Object IDs granted data-plane read permissions. The Azure format of object ID e.g. "f7856123-6546-428d-b1a0-901fac478f8a" Example Azure Object ID (UUID v4 format).  Number of characters should be 36 (including hyphens). Format also should match regex pattern: /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
     })
     
+    # Azure RESOURCE CONFIGURATION
     # ─────────────────────────────────────────────────────────────────────────
     # storage: Azure Storage Account (blueprint 01-storage)
     # ─────────────────────────────────────────────────────────────────────────
@@ -27,7 +28,8 @@ variable "config" {
       access_tier                 = string                        # REQUIRED. Blob access tier: Hot or Cool
       allow_public_network_access = optional(bool, true)          # DO NOT ASK USER FOR THAT. FOR NOW ONLY PUBLIC IS SUPPORTED. Set false to restrict access to private endpoints or VNet rules only
     })), null)
-
+    
+    # Azure RESOURCE CONFIGURATION
     # ─────────────────────────────────────────────────────────────────────────
     # keyvault: Azure Key Vault (blueprint 02-keyvault)
     # ─────────────────────────────────────────────────────────────────────────
