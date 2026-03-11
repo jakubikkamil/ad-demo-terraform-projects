@@ -1,0 +1,20 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "falcon2",
+        "ManagedBy": "terraform"
+      },
+      "admins": [
+        "f7856123-6546-428d-b1a0-901fac478f8a"
+      ]
+    },
+    "storages": {
+      "storage_account_1": {
+        "access_tier": "Hot",
+        "account_replication_type": "LRS"
+      }
+    }
+  }
+}
