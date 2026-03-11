@@ -377,39 +377,6 @@ jobs:
           echo "📤 Infrastructure Outputs:"
           terraform output 2>/dev/null || echo "No outputs defined"
 
-      - name: Create Deployment Report
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const status = '${{ steps.apply.outputs.status }}';
-            const icon = status === 'success' ? '✅' : '❌';
-            
-            let outputContent = "No outputs available";
-            try {
-              if (fs.existsSync('/tmp/tf-artifacts/outputs.json')) {
-                const outputs = JSON.parse(fs.readFileSync('/tmp/tf-artifacts/outputs.json', 'utf8'));
-                outputContent = "```json\n" + JSON.stringify(outputs, null, 2) + "\n```";
-              }
-            } catch (e) {
-              console.log("Could not read outputs:", e.message);
-            }
-            
-            const report = `## ${icon} Terraform Apply Report
-            
-            **Status**: ${status === 'success' ? '✅ SUCCESS' : '❌ FAILED'}
-            
-            **Deployment Details**:
-            - Branch: ${{ github.ref }}
-            - Commit: ${{ github.sha }}
-            - Actor: ${{ github.actor }}
-            - Timestamp: ${new Date().toLocaleString()}
-            
-            ### Infrastructure Outputs
-            ${outputContent}
-
 
       - name: Notify Deployment Success
         if: steps.apply.outputs.status == 'success'
