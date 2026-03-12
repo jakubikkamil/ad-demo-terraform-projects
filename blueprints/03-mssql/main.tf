@@ -49,7 +49,7 @@ resource "random_string" "sql_admin_login" {
 }
 
 # Generate random administrator password
-ephemeral "random_password" "sql_admin_password" {
+resource "random_password" "sql_admin_password" {
   length            = 32
   special           = true
   override_special  = "!@#$%^&*()_+-=[]{}?:,./<>|"
@@ -71,7 +71,7 @@ resource "azurerm_key_vault_secret" "sql_admin_login" {
 # Store password in Key Vault
 resource "azurerm_key_vault_secret" "sql_admin_password" {
   name         = "${local.base_name}-admin-password"
-  value        = ephemeral.random_password.sql_admin_password.result
+  value        = random_password.sql_admin_password.result
   key_vault_id = var.key_vault_id
 
   depends_on = [random_password.sql_admin_password]
@@ -83,8 +83,8 @@ resource "azurerm_mssql_server" "this" {
   resource_group_name          = var.resource_group_name
   location                     = var.location
   version                      = var.server_version
-  administrator_login          = var.administrator_login
-  administrator_login_password = var.administrator_login_password
+  administrator_login          = random_string.sql_admin_login.result
+  administrator_login_password = random_password.sql_admin_password.result
 
   # Minimum TLS version
   minimum_tls_version = var.minimum_tls_version
@@ -154,6 +154,7 @@ resource "azurerm_mssql_database" "this" {
 
   depends_on = [azurerm_mssql_server.this]
 }
+
 
 
 
