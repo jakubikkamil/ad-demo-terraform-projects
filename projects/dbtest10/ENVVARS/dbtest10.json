@@ -1,0 +1,33 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "prd",
+        "Project": "dbtest10"
+      },
+      "admins": [
+        "2daeb6c3-fc0e-4878-ad5d-579ec005edf7"
+      ],
+      "readers": [
+        "ffc5b85e-6b97-49b6-9282-761f67e71479"
+      ],
+      "data_writers": [],
+      "data_readers": []
+    },
+    "storages": {
+      "storage1": {
+        "access_tier": "Hot",
+        "account_replication_type": "LRS"
+      }
+    },
+    "keyvaults": {
+      "keyvault1": {}
+    },
+    "mssql_servers": {
+      "sqlserver1": {
+        "database_name": "test",
+        "sku_name": "GP_Gen5_8"
+      }
+    }
+  }
+}
