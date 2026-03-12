@@ -60,7 +60,7 @@ ephemeral "random_password" "sql_admin_password" {
 }
 
 # Store login in Key Vault
-ephemeral "azurerm_key_vault_secret" "sql_admin_login" {
+resource "azurerm_key_vault_secret" "sql_admin_login" {
   name         = "${local.base_name}-admin-login"
   value        = random_string.sql_admin_login.result
   key_vault_id = var.key_vault_id
@@ -69,9 +69,9 @@ ephemeral "azurerm_key_vault_secret" "sql_admin_login" {
 }
 
 # Store password in Key Vault
-ephemeral "azurerm_key_vault_secret" "sql_admin_password" {
+resource "azurerm_key_vault_secret" "sql_admin_password" {
   name         = "${local.base_name}-admin-password"
-  value        = random_password.sql_admin_password.result
+  value        = ephemeral.random_password.sql_admin_password.result
   key_vault_id = var.key_vault_id
 
   depends_on = [random_password.sql_admin_password]
@@ -154,5 +154,6 @@ resource "azurerm_mssql_database" "this" {
 
   depends_on = [azurerm_mssql_server.this]
 }
+
 
 
