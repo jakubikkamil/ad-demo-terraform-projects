@@ -1,0 +1,20 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "TestFalcon"
+      },
+      "resource_prefix": "testfalc",
+      "location": "polandcentral",
+      "admins": [
+        "ffc5b85e-6b97-49b6-9282-761f67e71479"
+      ]
+    },
+    "storages": {
+      "default": {
+        "access_tier": "Hot"
+      }
+    }
+  }
+}
