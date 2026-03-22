@@ -1,0 +1,1483 @@
+{
+  "name": "AI Terraform Project Scaffolder with GitHub PR Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "id": "4866f5c5-e435-4629-ae55-d14f403623a1",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        752,
+        688
+      ],
+      "webhookId": "c666cd74-ff01-4d1e-b25f-2930df3d56dd"
+    },
+    {
+      "parameters": {
+        "url": "=https://raw.githubusercontent.com/{{ $('Define Repository & Branch').item.json.repositoryName }}/{{ $('Define Repository & Branch').item.json.branchName }}/projects/project1/terraform/variables.tf",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "options": {}
+      },
+      "id": "bacb0b2c-dbc5-4210-9f6a-b0d7cca9d32b",
+      "name": "Fetch variables.tf",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        688
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Start variables.tf content:\n{{ $('Fetch variables.tf').item.json.data }}\nEnd variables.tf content\n\nUser request start: \n{{ $('Chat Trigger').item.json.chatInput }}\nUser request end\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You must ALWAYS return exactly one valid JSON object matching the output schema.\nDo not return markdown.\nDo not return code fences.\nDo not return explanatory text before or after the JSON.\nIf a field is not applicable, omit it unless the schema requires it.\n\nYou are a Terraform project validation assistant. Your job is to:\n\n1. Parse the provided variables.tf file to understand:\n   - Supported modules/features\n   - Supported Azure Resources\n   - Variable types (string, bool, number, list, map, object)\n   - Required vs optional variables\n   - Default values\n   - Allowed values (validation rules)\n   - Naming conventions\n   - IMPORTANT: Read the comment for each line and follow the guidelines about format whether to ask user or not.\n\n2. Analyze the user's request against this schema:\n   - Identify which resources they want. Always ask for that.\n   - Extract project_name, environment, team/user IDs, resource options\n   - Validate types and constraints\n   - Convert user-friendly inputs (yes/no → true/false, friendly names → canonical values)\n\n4. Be conservative:\n   - Ask clarifying questions rather than guessing\n   - Reject unsupported modules with explicit reasons\n   - Enforce all validation rules from variables.tf. Check comments for each lines\n   - Always return all missing required information so the user will know what information he needs to provide\n\n5. Don't mentioned to the user any code specific information.\n - your goal is to gather all necessary infrmaiton form user but don't expose variables structure.\n - users are not familiar with terraform\n - do not send the user any details about repository or code. Focus on user friendly content\n\n6. Regarding summary.\n - provide all information about every resource which will be created\n - provide all tags\n - provide project name\n - proivde info if more then 1 resources will be created if yes send info about all of them\n\n7. If the user asks a general infrastructure question and is not requesting a deployment:\n- set intent = \"infrastructure_question\"\n- set status = \"needs_clarification\"\n- put the direct user-friendly answer in \"summary\"\n- set follow_up_questions to an empty array unless you need more detail\n- Group question in follow up questions to Required and Optional\n- do not include validated_spec\n\n8. If the user is asking to create or change infrastructure:\n- set intent = \"deployment_request\" or \"mixed\"\n- extract all known information\n- if anything required is missing, set status = \"needs_clarification\"\n- if all required information is present but not yet approved, set status = \"needs_approval\"\n- only set status = \"complete\" after explicit user approval\n\nSTRICT:\n Status needs_approval:\n - If you have all necessary information and you want to proceed \n - Always ask user about available Azure resources if no resources has been provided by user\n - Provide detailed summary about project with all information which you know with user friendly format\n Status needs_clarification:\n   - If ANY required information is missing or ambiguous or user just ask question, set status='needs_clarification' and provide numbered follow-up questions\n Status complete:\n   - ONLY after approval is given\n   - ONLY If all required information is present and valid based on user request, set status='complete' and return validated_spec\n   -  Do not put status complete wihtout user confirmation that project is ready to deploy\n\n\n\nOutput format:\n- status: 'complete' or 'needs_approval' or 'needs_clarification'\n- summary: all detailed information about project and with question for approval (only if status='needs_approval')\n- follow_up_questions: array of numbered questions. Splitted into Required and Optional (only if status='needs_clarification')\n- validated_spec: canonical JSON spec (only if status='complete') with:\n  {\n    \"project_name\": \"string\",\n    \"modules\": [\"array of module names\"],\n    \"environment\": \"string\",\n    \"config\": {\"object with all terraform variables\"}\n  }"
+        }
+      },
+      "id": "e8ca69d9-4eec-4e26-a162-da3c8e88f65f",
+      "name": "Validate & Guide Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1520,
+        688
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"status\": {\n      \"type\": \"string\",\n      \"enum\": [\"complete\", \"needs_clarification\", \"needs_approval\"]\n    },\n    \"intent\": {\n      \"type\": \"string\",\n      \"enum\": [\"deployment_request\", \"infrastructure_question\", \"mixed\"]\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    },\n    \"follow_up_questions\": {\n      \"type\": \"array\",\n      \"items\": { \"type\": \"string\" }\n    },\n    \"validated_spec\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"project_name\": { \"type\": \"string\" },\n        \"modules\": {\n          \"type\": \"array\",\n          \"items\": { \"type\": \"string\" }\n        },\n        \"environment\": { \"type\": \"string\" },\n        \"config\": { \"type\": \"object\" }\n      },\n      \"required\": [\n        \"project_name\",\n        \"modules\",\n        \"environment\",\n        \"variables\"\n      ],\n      \"additionalProperties\": true\n    }\n  },\n  \"required\": [\"status\", \"intent\", \"summary\", \"follow_up_questions\"],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "5f4900a3-3365-401b-8528-56363cc328f4",
+      "name": "Validation Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1808,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Chat Trigger').item.json.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "id": "a1a7a80a-fc09-4901-acb2-45123e6c02ff",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "output",
+              "value": "={{ '❓'+$json.output.summary+'  \\n **Questions:**\\n\\n' + $json.output.follow_up_questions.map(q => q).join('\\n\\n') + '\\n\\nPlease provide these details so I can generate your Terraform project.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "823e3c45-b2ff-4d8d-aafa-eddc37070dcd",
+      "name": "Format Clarification",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2464,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/contents/projects/{{ $json.output.validated_spec.project_name }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c840dca9-c105-463f-8442-e6e9bc4bfc9d",
+      "name": "Check Project Folder Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        -64
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/branches?per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a41ca8a-2a5e-40db-a06b-00db49f3c392",
+      "name": "Check Branch Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2944,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/trees/{{ $('Define Repository & Branch').item.json.branchName }}?recursive=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9d82fedc-578d-4cba-8262-adbf96887838",
+      "name": "Get Project1 File Tree",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3392,
+        -64
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract all file paths from project1/terraform directory\nconst tree = $input.item.json.tree;\nconst projectName = $('Check Validation Status').item.json.output.validated_spec.project_name;\n\n// Filter files that are in projects/project1/terraform/\nconst project1Files = tree.filter(item => \n  item.type === 'blob' && \n  item.path.startsWith('projects/project1/terraform/')\n);\n\n// Map to new paths and include download URLs\nconst filesToCopy = project1Files.map(file => ({\n  originalPath: file.path,\n  newPath: file.path.replace('projects/project1/', `projects/${projectName}/`),\n  sha: file.sha,\n  url: file.url\n}));\n\nreturn [{ json: { files: filesToCopy, projectName } }];"
+      },
+      "id": "17c3439b-3014-4600-956e-659c9c894e2f",
+      "name": "Extract File Paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3616,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "files",
+        "options": {}
+      },
+      "id": "c5ffff32-8b51-4868-a6f0-279d7a731852",
+      "name": "Split File Paths",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3840,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "daae138e-decb-4f44-ac6f-28eaae2bb598",
+      "name": "Fetch File Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4064,
+        -144
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const projectName = $('Extract File Paths').item.json.projectName;\n\nreturn $input.all().map(item => {\n\n  // Decode base64 content\n  let content = Buffer\n    .from(item.json.content.replace(/\\n/g, ''), 'base64')\n    .toString('utf-8');\n\n  const path = item.json.newPath;\n\n  // Modify backend.tf key value\n  if (path && path.endsWith('backend.tf')) {\n    content = content.replace(\n      /(key\\s*=\\s*\")[^\"]*(\")/,\n      `$1${projectName}.terraform.tfstate$2`\n    );\n  }\n\n  return {\n    json: {\n      path: path,\n      content: content,\n      projectName: projectName\n    }\n  };\n\n});"
+      },
+      "id": "df46a713-d41d-49e7-a888-6e645c5f7124",
+      "name": "Decode and Prepare Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4512,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "output",
+              "value": "=❌ **Project Already Exists**\n\nA project with the name **{{ $('Check Validation Status').item.json.output.validated_spec.project_name }}** already exists in the repository.\n\nPlease choose a different project name or delete the existing project first.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "152d223a-f950-4e12-b62a-f3ff63dc699f",
+      "name": "Project Already Exists Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2944,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "4864eb43-1de4-4ded-b431-8b60b01cb563",
+      "name": "Collect Copied Files",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        4960,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/refs/heads/{{ $('Define Repository & Branch').item.json.branchName }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "812c3fd9-42c2-44cf-aa78-250654953ffb",
+      "name": "Get Main Branch SHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5184,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/refs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { ref: 'refs/heads/' + $json.branchName, sha: $json.mainSha } }}",
+        "options": {}
+      },
+      "id": "ce20e774-8c52-442f-94ac-e234f8246607",
+      "name": "Create New Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5632,
+        -48
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare branch creation data\nconst projectName = $('Check Validation Status').item.json.output.validated_spec.project_name;\nconst mainSha = $input.item.json.object.sha;\nconst timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');\nconst branchName = `feature/${projectName}-${timestamp}`;\n\nreturn [{\n  json: {\n    branchName: branchName,\n    mainSha: mainSha,\n    projectName: projectName,\n    files: $('Collect Copied Files').item.json\n  }\n}];"
+      },
+      "id": "e042179c-e678-4855-8b63-913a0d36dac5",
+      "name": "Prepare Branch Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5408,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all incoming branch items\nconst items = $input.all();\n\n// Extract only the JSON payloads\nconst branches = items.map(item => item.json);\n\n// Get project name from previous node\nconst projectName = $('Check Validation Status').first().json.output.validated_spec.project_name;\n\n\n// Check if any branch name includes the project name\nconst matchingBranch = branches.find(branch => \n  branch.name.includes(projectName)\n);\n\nif (matchingBranch) {\n  throw new Error(\n    `Branch with project name ${projectName} already exists: ${matchingBranch.name}`\n  );\n}\n\n// Continue workflow if no branch found\nreturn items;"
+      },
+      "id": "f10abd03-0c47-4923-a423-bd853bc8b64a",
+      "name": "Check Branch Name Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3168,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        912
+      ],
+      "id": "26e43e2a-a160-4cc3-ad26-305393cd4591",
+      "name": "Google Gemini Chat Model",
+      "retryOnFail": false,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "AJ2KfUKAWnhJ6YW5",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "sha",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4288,
+        -64
+      ],
+      "id": "c7135444-eeba-4b0b-8c1f-ad77545e0924",
+      "name": "Merge"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5856,
+        32
+      ],
+      "id": "e862b35e-b88f-4eb8-8b4a-e61056020fba",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/refs/heads/{{ $json.branchName }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "3ec59861-54c4-48f7-93af-50b5d77f9816",
+      "name": "Get Branch Reference",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6080,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/commits/{{ $json.object.sha }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "f91284ba-286f-4e9e-931b-f8563cf2d57e",
+      "name": "Get Base Commit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6304,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = $('Merge1').item.json.files; \nconst baseCommit = $input.item.json; \nconst base_tree_sha = baseCommit.tree.sha; \nconst tree = files.data.map(file => ({ path: file.path, mode: '100644', type: 'blob', content: file.content.replace(/\\n+$/, '') })); \nreturn [{ json: { tree: tree, base_tree_sha: base_tree_sha } }];"
+      },
+      "id": "ccf4c1ba-9a2d-4c4d-9101-8a3a98ca3a5c",
+      "name": "Prepare Tree Objects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6528,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/trees",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"base_tree\": $json.base_tree_sha, \"tree\": $json.tree } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "7f475f6a-c736-4914-8832-b5f71cfd9790",
+      "name": "Create Tree",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6752,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/commits",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"message\": \"Onboarding project $('Merge1').item.json.projectName\", \"tree\": $json.sha, \"parents\": [$('Get Base Commit').item.json.sha] } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "5fae3a11-38f5-4154-956c-de99ef1c5041",
+      "name": "Create Commit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6976,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/git/refs/heads/{{ $('Merge1').item.json.branchName }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"sha\": $json.sha, \"force\": false } }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "eea888eb-4ecc-41dc-af86-bb0194730a4a",
+      "name": "Update Branch Reference",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        7200,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "output",
+              "value": "=✅ **Files Committed Successfully!**\n\n**Project:** {{ $('Prepare Branch Data').item.json.projectName }}\n**Branch:** `{{ $('Prepare Branch Data').item.json.branchName }}`\n**Commit SHA:** `{{ $json.object.sha }}`\n**Files Committed:** {{ $('Prepare Tree Objects').item.json.tree.length }}\n\nAll files have been committed in a single atomic commit using the Git Data API.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6f1f7ebe-2021-4038-b956-e63f07db2eb6",
+      "name": "Format Git Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7648,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Define Repository & Branch').item.json.repositoryName }}/pulls",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"title\": 'Project Onboarding: ' + $('Check Validation Status').item.json.output.validated_spec.project_name,\n  \"body\": '## AI-Generated Terraform Project\\n\\n**Branch:**' + $('Prepare Branch Data').item.json.branchName + '\\n**Commit:** ' + $('Create Commit').item.json.message + '\\n\\n### Files Created\\n' + $('Merge1').item.json.files.data.map(f => '- `' + f.path + '`').join('\\n') + '\\n\\n### Validated Specification\\n```json\\n' + JSON.stringify($('Check Validation Status').item.json.output.validated_spec, null, 2) + '\\n```\\n\\nPlease review the generated Terraform files before merging.',\n  \"head\": $('Prepare Branch Data').item.json.branchName,\n  \"base\": $('Define Repository & Branch').item.json.branchName\n} }}",
+        "options": {}
+      },
+      "id": "45cc7d22-911e-46c3-8fda-7fa4394f399d",
+      "name": "Create Pull Request1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        7424,
+        32
+      ],
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "OVFEPWnbJS1BwHOl",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\nconst validatedSpec = $('Check Validation Status').first().json.output.validated_spec;\n\nconst projectName = validatedSpec.project_name;\n\n// Wrap config so the output file contains { \"config\": { ... } }\nconst contentJson = {\n  config: validatedSpec.config\n};\n\nreturn [\n  {\n    json: {\n      path: `projects/${projectName}/ENVVARS/${projectName}.json`,\n      content: JSON.stringify(contentJson, null, 2),\n      projectName: projectName\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4512,
+        160
+      ],
+      "id": "6a0240b4-511f-44b3-9a8e-6385336c9794",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4736,
+        32
+      ],
+      "id": "ac40bfe5-2887-480e-9fbe-7fbf9ed5fdab",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.status }}",
+                    "rightValue": "complete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3e100040-fdcb-4554-9bf1-8935090e7d4d"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3b137cfa-8186-4100-acf6-df905bb61c6f",
+                    "leftValue": "={{ $json.output.status }}",
+                    "rightValue": "needs_approval",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        672
+      ],
+      "id": "b47f312f-070a-4ecb-96b5-056bb2f5e182",
+      "name": "Check Validation Status"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1424,
+        912
+      ],
+      "id": "e841d798-7f55-486e-beb9-6df67715742e",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "TgOG3ISKREkbDiyH",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.2,
+      "position": [
+        7872,
+        32
+      ],
+      "id": "2638acfd-e644-49a8-9f76-fef920f67fb1",
+      "name": "Chat2",
+      "webhookId": "7d601547-a91e-4c84-99d3-3c213db8aa39"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f58dc63a-09d4-4a94-8999-e48318a04db2",
+              "leftValue": "={{ $json.output.intent }}",
+              "rightValue": "=infrastructure_question",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2240,
+        976
+      ],
+      "id": "4c6da460-f282-47a2-b9d4-fdf63dc83d07",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "output",
+              "value": "={{ $json.output.summary }}\n{{ $json.output.follow_up_questions }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "29dc12df-631b-4406-ae69-49f691f953d9",
+      "name": "Format Infra Question Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2464,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.2,
+      "position": [
+        2688,
+        880
+      ],
+      "id": "a928977c-84a7-4f99-9d1f-d6ec608a7f94",
+      "name": "Infrastructure Question Response",
+      "webhookId": "8463857f-156b-48b2-bf78-3c6e4e11dea1"
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.2,
+      "position": [
+        2688,
+        1072
+      ],
+      "id": "9c07487e-e66f-4863-825f-abeb3be1a62c",
+      "name": "Needs Clarification Response",
+      "webhookId": "8463857f-156b-48b2-bf78-3c6e4e11dea1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "output",
+              "value": "={{ '❓ **I need an approval:**\\n\\n' + $json.output.summary + '\\n\\nPlease let me know if you approve those changes.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf09954b-73e7-431c-8492-1e7278398b13",
+      "name": "Format Approval",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2240,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1.2,
+      "position": [
+        2464,
+        688
+      ],
+      "id": "1331defc-deab-46d3-b55d-080f4accf0c5",
+      "name": "Approval Response",
+      "webhookId": "0652f7a3-2a18-4167-ab53-0f5ade463c30"
+    },
+    {
+      "parameters": {
+        "content": "## Use Interface",
+        "height": 816,
+        "width": 2240
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        688,
+        512
+      ],
+      "id": "f67f30b7-54a6-418b-b4a7-fa31c473ad32",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "Integrations",
+        "height": 784,
+        "width": 5616,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        -320
+      ],
+      "id": "125618aa-a1dd-4a8d-8c63-9a1d8d1b6fee",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "branchName",
+              "value": "sql",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "repositoryName",
+              "value": "jakubikkamil/ad-demo-terraform-projects",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "20cafe05-2daa-4e0b-b1c9-07caa021e3ff",
+      "name": "Define Repository & Branch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        976,
+        688
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Define Repository & Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch variables.tf": {
+      "main": [
+        [
+          {
+            "node": "Validate & Guide Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Validate & Guide Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Validate & Guide Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Guide Agent": {
+      "main": [
+        [
+          {
+            "node": "Check Validation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Project Folder Exists": {
+      "main": [
+        [
+          {
+            "node": "Project Already Exists Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Branch Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Branch Exists": {
+      "main": [
+        [
+          {
+            "node": "Check Branch Name Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Project1 File Tree": {
+      "main": [
+        [
+          {
+            "node": "Extract File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File Paths": {
+      "main": [
+        [
+          {
+            "node": "Split File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split File Paths": {
+      "main": [
+        [
+          {
+            "node": "Fetch File Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch File Content": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Decode and Prepare Files": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Copied Files": {
+      "main": [
+        [
+          {
+            "node": "Get Main Branch SHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Main Branch SHA": {
+      "main": [
+        [
+          {
+            "node": "Prepare Branch Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Branch Data": {
+      "main": [
+        [
+          {
+            "node": "Create New Branch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Branch": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Branch Name Match": {
+      "main": [
+        [
+          {
+            "node": "Get Project1 File Tree",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Decode and Prepare Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Get Branch Reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tree": {
+      "main": [
+        [
+          {
+            "node": "Create Commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Branch Reference": {
+      "main": [
+        [
+          {
+            "node": "Get Base Commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Base Commit": {
+      "main": [
+        [
+          {
+            "node": "Prepare Tree Objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Tree Objects": {
+      "main": [
+        [
+          {
+            "node": "Create Tree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Commit": {
+      "main": [
+        [
+          {
+            "node": "Update Branch Reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Branch Reference": {
+      "main": [
+        [
+          {
+            "node": "Create Pull Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pull Request1": {
+      "main": [
+        [
+          {
+            "node": "Format Git Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Collect Copied Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Clarification": {
+      "main": [
+        [
+          {
+            "node": "Needs Clarification Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Validation Status": {
+      "main": [
+        [
+          {
+            "node": "Check Project Folder Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Validate & Guide Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Git Success": {
+      "main": [
+        [
+          {
+            "node": "Chat2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Format Infra Question Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Clarification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Infra Question Response": {
+      "main": [
+        [
+          {
+            "node": "Infrastructure Question Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Approval": {
+      "main": [
+        [
+          {
+            "node": "Approval Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Response": {
+      "main": [
+        []
+      ]
+    },
+    "Define Repository & Branch": {
+      "main": [
+        [
+          {
+            "node": "Fetch variables.tf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "availableInMCP": false
+  },
+  "versionId": "e060f40f-d3c0-4c43-82d0-d34067117094",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cc043915a4f5f4208059089c38acedaf34f36aca0ced8dab84511e31db602053"
+  },
+  "id": "3dzkFU6aQQreqASX",
+  "tags": []
+}
