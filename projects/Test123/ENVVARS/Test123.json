@@ -1,0 +1,27 @@
+{
+  "config": {
+    "init": {
+      "tags": {
+        "Environment": "dev",
+        "Project": "Test123",
+        "ManagedBy": "terraform"
+      },
+      "resource_prefix": "test123",
+      "admins": [
+        "2daeb6c3-fc0e-4878-ad5d-579ec005edf7"
+      ],
+      "readers": [
+        "ffc5b85e-6b97-49b6-9282-761f67e71479"
+      ]
+    },
+    "storages": {
+      "storage1": {
+        "account_replication_type": "LRS",
+        "access_tier": "Hot"
+      }
+    },
+    "keyvaults": {
+      "keyvault1": {}
+    }
+  }
+}
