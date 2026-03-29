@@ -1,0 +1,39 @@
+{
+  "config": {
+    "keyvaults": {
+      "default_keyvault": {
+        "network_acls": {},
+        "purge_protection_enabled": false,
+        "name_override": "",
+        "soft_delete_retention_days": 7
+      }
+    },
+    "init": {
+      "admins": [
+        "2daeb6c3-fc0e-4878-ad5d-579ec005edf7"
+      ],
+      "resource_prefix": "falcon4",
+      "data_readers": [],
+      "location": "polandcentral",
+      "readers": [],
+      "tags": {
+        "ManagedBy": "terraform",
+        "Environment": "dev",
+        "Project": "falcon4"
+      },
+      "data_writers": [
+        "ffc5b85e-6b97-49b6-9282-761f67e71479"
+      ]
+    },
+    "storages": {
+      "default_storage": {
+        "account_tier": "Standard",
+        "name_override": "",
+        "account_replication_type": "LRS",
+        "allow_public_network_access": true,
+        "account_kind": "StorageV2",
+        "access_tier": "Hot"
+      }
+    }
+  }
+}
