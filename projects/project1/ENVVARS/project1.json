@@ -20,6 +20,13 @@
           "soft_delete_retention_days": null,
           "purge_protection_enabled": false
         }
+      },
+      "mssql_servers": {
+        "sqlserver1": {
+          "database_name": "maindb",
+          "sku_name": "S2",
+          "backup_retention_days": 7
+        }
       }
     }
   }
